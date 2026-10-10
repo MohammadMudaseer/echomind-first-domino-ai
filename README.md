@@ -1,39 +1,42 @@
-# EchoMind — First Domino AI
+# EchoMind — First Domino AI (v2 · live tracking build)
 
-A Streamlit hackathon prototype that simulates how an urban hazard can cascade through connected systems and compares illustrative preventive interventions.
+A Streamlit hackathon prototype that tracks live rain and community reports, simulates how an urban hazard cascades through connected systems, and compares illustrative preventive interventions.
 
-## Features
-- Adjustable rainfall, drain blockage, and starting traffic load.
-- NetworkX dependency graph and rule-based risk indices.
-- Baseline vs. intervention comparison.
-- Interactive Folium map for Warangal, Hyderabad, or New Delhi.
-- Optional current weather from Open-Meteo when internet access is available.
-- Community incident reporting with location coordinates, severity, and description.
-- Reports stored locally in `incident_reports.csv`, displayed as unverified purple pins, and downloadable as CSV.
+## What's new in v2
+**Live tracking**
+- 📡 **Live rainfall feed** (Open-Meteo): current conditions plus a past-24 h / next-24 h hourly rain chart with a "now" marker.
+- 🔄 **Auto-refresh** live panel (30 s / 1 min / 5 min / off) using Streamlit fragments — no full-page flicker.
+- 🌧️ **Simulation driven by live rain**: rainfall input = observed past 3 h + forecast next 3 h; the model recalculates automatically when new data arrives.
+- 📍 **Device tracking (optional)**: browser GPS shows "you are here", accuracy ring, session trail, and distance to the nearest report / demo risk point. One tick to use your GPS position in a report.
+- 🗺️ **Live report feed**: new reports appear on the map and table automatically, with time filters, clustering, and status-coloured pins.
+- 🚦 Status banner (LOW / ELEVATED / HIGH) and a forecast heads-up when ≥10 mm is expected in the next 6 h.
+
+**Model & product improvements**
+- Cleaner, unit-tested engine (`engine.py`); fixed convoluted pump-intervention logic.
+- Rank **all** interventions against the same scenario (table + chart).
+- "Report pressure" indicator; optional blending of unresolved recent reports into the flood index.
+- Reports now have IDs, atomic writes, automatic upgrade of old CSV files, and reviewer statuses (Unverified → Plausible / Not supported / Resolved).
+- Tabbed layout: Live monitor · Simulation · Report · Limitations. XSS-safe map popups.
 
 ## Run locally
-Use Python 3.10 or newer.
-
+Python 3.10+.
 ```bash
 python -m venv .venv
-# Windows PowerShell:
-.venv\Scripts\Activate.ps1
-# macOS/Linux:
-source .venv/bin/activate
+source .venv/bin/activate        # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 streamlit run app.py
 ```
+Run tests: `python -m unittest discover -s tests -v`
 
-Open the local URL printed by Streamlit, usually `http://localhost:8501`.
+GPS needs `streamlit-js-eval` (in requirements) and a secure context: `localhost` or HTTPS. Browsers block geolocation on plain-HTTP remote hosts.
 
-## Demo flow
-1. Set rainfall to around 75 mm, blockage to 85%, and traffic to 65%.
-2. Review the map and weather status.
-3. Submit a clearly fictional incident report and show its purple pin.
-4. Inspect the dependency graph and baseline risks.
-5. Select “Clear the critical drain” and compare indices.
-
-See `DEMO_VIDEO_SCRIPT.md` and `DEMO_VIDEO_CAPTIONS.srt` for the timed video plan and captions.
+## Demo flow (live version)
+1. Leave "Live rainfall feed" and "Drive the simulation" ticked; show the status pills and live chart.
+2. Tick "Track my device location", allow GPS, show the blue dot and trail.
+3. Submit a clearly fictional report (tick "Use my tracked GPS location"); watch it appear on the map.
+4. Open a second browser tab, submit another report — the first tab picks it up at the next refresh.
+5. In Simulation, show the failure chain and the intervention ranking; pick "Clear the critical drain".
+6. If it's dry that day, untick "Drive from live rainfall" and set 75 mm to demonstrate a heavy-rain scenario.
 
 ## Data and safety limitations
-This is a demonstration, not an operational warning system. The graph and scores are rule-based and illustrative—not calibrated probabilities or verified predictions. Map risk pins are sample points around the selected city center. Weather does not verify flooding. Incident reports are user-submitted and unverified, saved only to the local app machine, and are not transmitted to authorities. Do not use the prototype for emergency dispatch or infrastructure decisions.
+Demonstration only — not an operational warning system. Live data: Open-Meteo weather (model-based at the area centre, not a street gauge) and the local report file. Drain status, traffic and utilities are manual or simulated; no sensors are connected. Scores are illustrative indices, not calibrated probabilities. Reports are unverified, stored on the app machine, shared only with users of that same app instance, and never sent to authorities. Reviewer status changes are unauthenticated. Do not use for emergency dispatch or infrastructure decisions.

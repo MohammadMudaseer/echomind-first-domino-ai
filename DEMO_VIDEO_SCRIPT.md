@@ -43,3 +43,7 @@
 - Keep the “simulated” and “unverified” labels visible when showing the map.
 - If weather fails, narrate the fallback honestly—do not fake live values.
 - Export MP4, 1920×1080 if possible, 30 fps; keep the video near 2 minutes.
+
+## v2 additions (live tracking) — optional 30 s insert after the map segment
+**Screen:** Live monitor tab: status pills, rain chart with red "now" line, toggle GPS, show blue dot; submit a report and watch it appear.  
+**Narration:** “Weather is now live and refreshes automatically. The rainfall input can drive the simulation, and we can track our own location and file a report from exactly where we stand. Drain status and traffic are still simulated — no sensors are connected.”

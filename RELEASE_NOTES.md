@@ -1,6 +1,9 @@
 # EchoMind release notes — v2 live tracking build
 
-## Added
+## v3 additions
+- Hourly risk forecast with first-ELEVATED/HIGH times, session trend, multi-area live comparison, evidence check, downloadable situation report, demo-report helpers, +4 tests.
+
+## Added (v2)
 - Live Open-Meteo rainfall: current conditions + 48 h hourly series; chart with now-marker.
 - Auto-refreshing live panel (fragment) with configurable interval; full re-run only when live inputs change.
 - Simulation can be driven by live rainfall (past 3 h + next 3 h).

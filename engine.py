@@ -285,3 +285,109 @@ def report_pressure(df: pd.DataFrame, hours=24, now=None) -> float:
         return 0.0
     total = sum(SEVERITY_WEIGHT.get(s, 0.5) for s in recent["severity"])
     return clamp(total / 3.0)
+
+
+# --------------------------------------------------------------------------
+# v3: hourly risk forecast, situation report, demo reports
+# --------------------------------------------------------------------------
+def risk_timeline(hourly: pd.DataFrame, now, blockage_pct, traffic_load,
+                  intervention=INTERVENTIONS[0], report_pressure_value=0.0, hours=24, win_h=3) -> pd.DataFrame:
+    """Hour-by-hour illustrative risk. Each hour uses rain over [t-win_h, t+win_h) — the same
+    6 h window as the live input. Only hours whose window is fully covered by data are returned."""
+    cols = ["time", "rain_mm", "Baseline", "With intervention"]
+    if hourly.empty or pd.isna(now):
+        return pd.DataFrame(columns=cols)
+    hour_now = pd.Timestamp(now).floor("h")
+    last = hourly["time"].max()
+    rows = []
+    for t in hourly[(hourly["time"] >= hour_now) & (hourly["time"] < hour_now + pd.Timedelta(hours=hours))]["time"]:
+        if t + pd.Timedelta(hours=win_h - 1) > last:
+            break
+        win = hourly[(hourly["time"] >= t - pd.Timedelta(hours=win_h)) & (hourly["time"] < t + pd.Timedelta(hours=win_h))]
+        mm = float(win["precip_mm"].sum(skipna=True))
+        b = worst_downstream(simulate(mm, blockage_pct, traffic_load, INTERVENTIONS[0], report_pressure_value)) * 100
+        i = worst_downstream(simulate(mm, blockage_pct, traffic_load, intervention, report_pressure_value)) * 100
+        rows.append({"time": t, "rain_mm": round(mm, 1), "Baseline": round(b, 1), "With intervention": round(i, 1)})
+    return pd.DataFrame(rows, columns=cols)
+
+
+def first_crossing(timeline: pd.DataFrame, column: str, threshold: float):
+    """First timestamp where `column` >= threshold, else None."""
+    if timeline.empty:
+        return None
+    hit = timeline[timeline[column] >= threshold]
+    return None if hit.empty else hit.iloc[0]["time"]
+
+
+def ground_truth_note(band: str, recent_reports: int) -> str:
+    """Compare model concern with recent community evidence (both are unverified signals)."""
+    if band in ("HIGH", "ELEVATED") and recent_reports == 0:
+        return "Model concern is raised but no recent reports yet — check drains or ask locals to report."
+    if band == "LOW" and recent_reports >= 2:
+        return "Several recent reports but low model concern — the model may be missing local conditions (e.g. blocked drains)."
+    if band in ("HIGH", "ELEVATED") and recent_reports >= 1:
+        return f"Model concern and {recent_reports} recent report(s) point the same way (both unverified)."
+    return "No strong signal from either source."
+
+
+def build_sitrep(area, now_text, rain_mm, using_live, blockage, traffic, baseline_scores, after_scores,
+                 intervention, trigger, band, pressure_pct, recent: pd.DataFrame, first_elevated, first_high) -> str:
+    lines = [
+        f"# EchoMind situation report — {area}",
+        f"Generated: {now_text}",
+        "",
+        "> ILLUSTRATIVE PROTOTYPE OUTPUT. Indices are not probabilities; reports are unverified. Not for dispatch or official warnings.",
+        "",
+        "## Inputs",
+        f"- Rainfall input: {rain_mm:.1f} mm ({'live Open-Meteo, past 3 h + next 3 h' if using_live else 'manual'})",
+        f"- Drain blockage: {blockage}% (manual) · Starting traffic: {traffic}% (manual)",
+        "",
+        "## Status",
+        f"- Concern band: **{band}** (worst downstream index {eng_worst(baseline_scores):.0f}/100)",
+        f"- First Domino candidate: {trigger}",
+        f"- First hour at ELEVATED (≥40): {first_elevated if first_elevated is not None else 'not within forecast window'}",
+        f"- First hour at HIGH (≥70): {first_high if first_high is not None else 'not within forecast window'}",
+        f"- Community report pressure (24 h): {pressure_pct:.0f}/100",
+        "",
+        f"## Intervention tested: {intervention}",
+        f"- Worst downstream index: {eng_worst(baseline_scores):.0f} → {eng_worst(after_scores):.0f}",
+        "",
+        "## Index table (baseline → after)",
+    ]
+    for n in baseline_scores:
+        lines.append(f"- {n} ({LOCATIONS[n]}): {baseline_scores[n]*100:.0f} → {after_scores[n]*100:.0f}")
+    lines += ["", f"## Recent unresolved reports ({len(recent)})"]
+    if recent.empty:
+        lines.append("- None")
+    else:
+        for _, r in recent.head(15).iterrows():
+            lines.append(f"- [{r['severity']}] {r['incident_type']} — {r['area']} ({r['status']}, {r['reported_at']})")
+    return "\n".join(lines) + "\n"
+
+
+def eng_worst(scores) -> float:
+    return worst_downstream(scores) * 100
+
+
+DEMO_TAG = "[DEMO — fictional]"
+
+
+def seed_demo_reports(path: Path, lat: float, lon: float) -> int:
+    samples = [
+        ("Blocked drain", "Drain near the market is full of plastic and leaves.", "High", 0.010, -0.012, "Demo market lane"),
+        ("Street flooding / waterlogging", "Knee-deep water at the low point after rain.", "Critical", 0.003, -0.003, "Demo low point"),
+        ("Road disruption", "Junction partly closed, vehicles turning back.", "Moderate", -0.006, 0.004, "Demo bridge junction"),
+        ("Traffic congestion", "Queue building along the main avenue.", "Moderate", 0.006, 0.010, "Demo central avenue"),
+    ]
+    for t, d, s, dlat, dlon, a in samples:
+        save_incident(path, t, f"{DEMO_TAG} {d}", s, lat + dlat, lon + dlon, a)
+    return len(samples)
+
+
+def delete_demo_reports(path: Path) -> int:
+    with _WRITE_LOCK:
+        data = load_incidents(path)
+        mask = data["description"].str.startswith(DEMO_TAG)
+        if mask.any():
+            _atomic_write(Path(path), data[~mask])
+        return int(mask.sum())

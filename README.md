@@ -11,6 +11,15 @@ A Streamlit hackathon prototype that tracks live rain and community reports, sim
 - 🗺️ **Live report feed**: new reports appear on the map and table automatically, with time filters, clustering, and status-coloured pins.
 - 🚦 Status banner (LOW / ELEVATED / HIGH) and a forecast heads-up when ≥10 mm is expected in the next 6 h.
 
+**v3 additions**
+- ⏱️ **Hourly risk forecast** — "when does the first domino fall?": illustrative index per hour from forecast rain, baseline vs your selected intervention, with first-ELEVATED / first-HIGH times.
+- 📈 **Session trend** that grows with each auto-refresh (rain input, worst index, report pressure).
+- 🌍 **Compare all areas live** (Warangal / Hyderabad / New Delhi) on rainfall.
+- 🔎 **Evidence check**: compares model concern with recent community reports and flags mismatches.
+- 📄 **Downloadable situation report** (Markdown) with inputs, status, first-crossing times, intervention effect and open reports.
+- 🧪 **Demo helpers**: load/remove 4 clearly-labelled fictional reports in one click.
+- 17 unit tests (was 13).
+
 **Model & product improvements**
 - Cleaner, unit-tested engine (`engine.py`); fixed convoluted pump-intervention logic.
 - Rank **all** interventions against the same scenario (table + chart).

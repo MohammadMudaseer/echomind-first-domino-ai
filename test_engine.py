@@ -101,5 +101,41 @@ class IncidentTests(unittest.TestCase):
         self.assertEqual(e.report_pressure(old), 0.0)
         self.assertEqual(e.report_pressure(pd.DataFrame(columns=e.INCIDENT_COLUMNS)), 0.0)
 
+
+
+class V3Tests(unittest.TestCase):
+    def hourly(self):
+        t = pd.date_range("2026-10-10 00:00", periods=48, freq="h")
+        mm = [0.0] * 12 + [4.0] * 6 + [0.0] * 30
+        return pd.DataFrame({"time": t, "precip_mm": mm, "precip_prob": [50] * 48})
+
+    def test_timeline_and_crossing(self):
+        tl = e.risk_timeline(self.hourly(), pd.Timestamp("2026-10-10 10:30"), 85, 65, "Clear the critical drain")
+        self.assertFalse(tl.empty)
+        self.assertTrue((tl["With intervention"] <= tl["Baseline"] + 1e-9).all())
+        self.assertIsNotNone(e.first_crossing(tl, "Baseline", 40))
+        self.assertIsNone(e.first_crossing(tl, "Baseline", 1000))
+        self.assertTrue(e.risk_timeline(pd.DataFrame(columns=["time", "precip_mm", "precip_prob"]), pd.NaT, 1, 1).empty)
+
+    def test_ground_truth(self):
+        self.assertIn("no recent reports", e.ground_truth_note("HIGH", 0))
+        self.assertIn("missing", e.ground_truth_note("LOW", 3))
+        self.assertIn("same way", e.ground_truth_note("HIGH", 2))
+
+    def test_demo_seed_and_delete(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "i.csv"
+            e.save_incident(p, "Other hazard", "real one", "Low", 1, 1, "x")
+            self.assertEqual(e.seed_demo_reports(p, 17.9, 79.5), 4)
+            self.assertEqual(len(e.load_incidents(p)), 5)
+            self.assertEqual(e.delete_demo_reports(p), 4)
+            self.assertEqual(len(e.load_incidents(p)), 1)
+
+    def test_sitrep(self):
+        b = e.simulate(75, 85, 65); a = e.simulate(75, 85, 65, "Clear the critical drain")
+        txt = e.build_sitrep("X", "now", 75, False, 85, 65, b, a, "Clear the critical drain", "Drain blockage",
+                             "HIGH", 0, pd.DataFrame(columns=e.INCIDENT_COLUMNS), None, None)
+        self.assertIn("ILLUSTRATIVE", txt); self.assertIn("HIGH", txt)
+
 if __name__ == "__main__":
     unittest.main()

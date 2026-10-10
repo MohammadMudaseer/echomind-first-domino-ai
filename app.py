@@ -110,6 +110,8 @@ with st.sidebar:
     track_me = st.checkbox("Track my device location (browser GPS)", value=False,
                            help="Your browser will ask permission. Needs HTTPS or localhost. Location stays in this session.")
     report_age_label = st.selectbox("Show reports", list(AGE_OPTIONS), index=1)
+    compare_cities = st.checkbox("Compare all areas live", value=False,
+                                 help="Fetches the other monitored cities too (2 extra requests per refresh).")
 
     st.divider()
     st.header("Scenario controls")
@@ -146,6 +148,12 @@ after = eng.simulate(rain_mm, blockage_pct, traffic_load, intervention, pressure
 trigger, impact = eng.top_trigger(baseline)
 worst_base = eng.worst_downstream(baseline) * 100
 band = eng.risk_band(worst_base)
+if weather:
+    timeline = eng.risk_timeline(weather["hourly"], weather["now"], blockage_pct, traffic_load, intervention, pressure)
+else:
+    timeline = pd.DataFrame(columns=["time", "rain_mm", "Baseline", "With intervention"])
+first_elev = eng.first_crossing(timeline, "Baseline", 40)
+first_high = eng.first_crossing(timeline, "Baseline", 70)
 
 
 def data_signature(weather_obj, reports_df):
@@ -175,6 +183,14 @@ elif band == "ELEVATED":
 else:
     st.success(f"Simulated cascade concern: **LOW** ({worst_base:.0f}/100 worst downstream index).")
 
+if not timeline.empty:
+    fmt_t = lambda t: pd.Timestamp(t).strftime("%a %H:%M")
+    st.caption("⏱️ Hourly outlook (baseline, next ~18 h): "
+               + (f"reaches ELEVATED at {fmt_t(first_elev)}" if first_elev is not None else "stays below ELEVATED")
+               + " · "
+               + (f"reaches HIGH at {fmt_t(first_high)}" if first_high is not None else "stays below HIGH")
+               + ". Illustrative index from forecast rain + your blockage/traffic inputs.")
+
 c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("Rainfall input", f"{rain_mm:.1f} mm", help="Live-driven" if using_live_rain else "Manual")
 c2.metric("Drain blockage", f"{blockage_pct}%")
@@ -202,6 +218,19 @@ def live_panel():
     shown = filter_by_age(reports, AGE_OPTIONS[report_age_label])
     st.caption(f"Panel refreshed {datetime.now().strftime('%H:%M:%S')} (device clock)"
                + (f" • auto-refresh every {refresh_label}" if refresh_s else " • auto-refresh off"))
+
+    # ---- Session trend ----
+    hist = st.session_state.setdefault("trend", [])
+    stamp = datetime.now().strftime("%H:%M:%S")
+    if not hist or hist[-1]["time"] != stamp:
+        hist.append({"time": stamp, "Rain input (mm)": round(rain_mm, 1), "Worst index": round(worst_base, 1),
+                     "Report pressure": round(pressure_24h * 100, 1)})
+        del hist[:-120]
+    with st.expander(f"Session trend ({len(hist)} refresh points)"):
+        if len(hist) > 1:
+            st.line_chart(pd.DataFrame(hist).set_index("time"))
+        else:
+            st.caption("The trend builds up with each auto-refresh while this page stays open.")
 
     # ---- Weather ----
     if w:
@@ -234,6 +263,21 @@ def live_panel():
             rule = alt.Chart(pd.DataFrame({"time": [now_h]})).mark_rule(strokeDash=[4, 4], color="#ef4444").encode(x="time:T")
             st.altair_chart((bars + rule).properties(height=210, title="Rain: past 24 h and next 24 h (red line = now)"),
                             use_container_width=True)
+            tl = eng.risk_timeline(w["hourly"], w["now"], blockage_pct, traffic_load, intervention, pressure)
+            if not tl.empty:
+                long = tl.melt(id_vars=["time", "rain_mm"], value_vars=["Baseline", "With intervention"],
+                               var_name="Scenario", value_name="Index")
+                lines = alt.Chart(long).mark_line(point=True).encode(
+                    x=alt.X("time:T", title="Hour (Asia/Kolkata)"),
+                    y=alt.Y("Index:Q", scale=alt.Scale(domain=[0, 100]), title="Worst downstream index"),
+                    color=alt.Color("Scenario:N", scale=alt.Scale(domain=["Baseline", "With intervention"], range=["#ef4444", "#16a34a"])),
+                    tooltip=[alt.Tooltip("time:T"), "Scenario", "Index", alt.Tooltip("rain_mm:Q", title="6 h rain (mm)")])
+                thresholds = alt.Chart(pd.DataFrame({"y": [40, 70]})).mark_rule(strokeDash=[3, 3], color="#94a3b8").encode(y="y:Q")
+                st.altair_chart((lines + thresholds).properties(height=220, title="When does the first domino fall? Hourly illustrative index (grey lines = 40 / 70)"),
+                                use_container_width=True)
+                gain = (tl["Baseline"] - tl["With intervention"]).max()
+                st.caption(f"Selected intervention ('{intervention}') cuts the peak by up to {gain:.0f} index points in this outlook."
+                           if intervention != eng.INTERVENTIONS[0] else "Pick an intervention in the sidebar to see it as the green line.")
             nxt = hourly[hourly["time"] >= now_h].head(6)
             if not nxt.empty and nxt["precip_mm"].sum() >= 10:
                 st.warning(f"Forecast shows {nxt['precip_mm'].sum():.1f} mm in the next 6 h at the area centre. "
@@ -329,6 +373,25 @@ def live_panel():
             if hz is not None:
                 st.caption(f"Nearest demo risk point: {hz['Location']} · {eng.fmt_distance(hd)}")
 
+    # ---- Ground-truth check ----
+    st.info("🔎 Evidence check: " + eng.ground_truth_note(band, len(eng.recent_incidents(reports, 24))))
+
+    # ---- City comparison ----
+    if compare_cities:
+        with st.expander("All monitored areas (live)", expanded=True):
+            rows = []
+            for city, (la, lo) in CITY_COORDS.items():
+                cw, _, _ = get_weather(la, lo)
+                if cw:
+                    p_, f_, _ = eng.rainfall_window(cw["hourly"], cw["now"], 3, 3)
+                    idx = eng.worst_downstream(eng.simulate(p_ + f_, blockage_pct, traffic_load)) * 100
+                    rows.append({"Area": city, "Rain now (mm)": cw["current"].get("precipitation"),
+                                 "Past 3 h + next 3 h (mm)": round(p_ + f_, 1), "Worst index": round(idx), "Band": eng.risk_band(idx)})
+                else:
+                    rows.append({"Area": city, "Rain now (mm)": None, "Past 3 h + next 3 h (mm)": None, "Worst index": None, "Band": "offline"})
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            st.caption("Uses your blockage and traffic inputs for every area, so differences come from rainfall only.")
+
     # ---- Live incident feed ----
     st.markdown(f"#### Live report feed — {report_age_label.lower()}")
     if shown.empty:
@@ -397,6 +460,16 @@ with tab_sim:
         st.markdown(f"**{title}** — {desc}")
 
 
+    st.markdown("### Situation report")
+    sitrep_md = eng.build_sitrep(map_city, datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z"), rain_mm, using_live_rain,
+                                 blockage_pct, traffic_load, baseline, after, intervention, trigger, band, pressure_24h * 100,
+                                 eng.recent_incidents(all_reports, 24), first_elev, first_high)
+    st.download_button("Download situation report (Markdown)", sitrep_md.encode("utf-8"),
+                       file_name=f"echomind_sitrep_{datetime.now().strftime('%Y%m%d_%H%M')}.md", mime="text/markdown")
+    with st.expander("Preview report"):
+        st.markdown(sitrep_md)
+
+
 # --------------------------------------------------------------------------
 # TAB 3 — reporting
 # --------------------------------------------------------------------------
@@ -430,6 +503,18 @@ with tab_report:
                     st.rerun()
                 except OSError as exc:
                     st.error(f"Could not save the report locally: {exc}")
+
+    with st.expander("Demo helpers"):
+        st.caption("Adds clearly labelled fictional reports around the area centre so you can show the live map and evidence check.")
+        d1, d2 = st.columns(2)
+        if d1.button("Load 4 sample demo reports"):
+            n = eng.seed_demo_reports(INCIDENT_FILE, center_lat, center_lon)
+            st.session_state["flash"] = f"Added {n} fictional demo reports."
+            st.rerun()
+        if d2.button("Remove demo reports"):
+            n = eng.delete_demo_reports(INCIDENT_FILE)
+            st.session_state["flash"] = f"Removed {n} demo report(s)."
+            st.rerun()
 
     st.markdown("#### All saved reports")
     reports_now = safe_load_incidents()

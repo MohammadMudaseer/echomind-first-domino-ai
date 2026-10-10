@@ -1,65 +1,39 @@
 # EchoMind — First Domino AI
 
-A low-cost hackathon MVP that demonstrates cascading urban risks with simulated data.
+A Streamlit hackathon prototype that simulates how an urban hazard can cascade through connected systems and compares illustrative preventive interventions.
 
-## 1. Requirements
-- Python 3.10 or newer
-- Internet connection for the initial package installation
-- No API keys, sensors, database, or cloud account required
+## Features
+- Adjustable rainfall, drain blockage, and starting traffic load.
+- NetworkX dependency graph and rule-based risk indices.
+- Baseline vs. intervention comparison.
+- Interactive Folium map for Warangal, Hyderabad, or New Delhi.
+- Optional current weather from Open-Meteo when internet access is available.
+- Community incident reporting with location coordinates, severity, and description.
+- Reports stored locally in `incident_reports.csv`, displayed as unverified purple pins, and downloadable as CSV.
 
-## 2. Run locally
+## Run locally
+Use Python 3.10 or newer.
+
 ```bash
-# Windows PowerShell or Command Prompt
 python -m venv .venv
-.venv\Scripts\activate
-python -m pip install --upgrade pip
+# Windows PowerShell:
+.venv\Scripts\Activate.ps1
+# macOS/Linux:
+source .venv/bin/activate
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
-On macOS/Linux, activate with:
-```bash
-source .venv/bin/activate
-```
-Streamlit prints a local URL, usually http://localhost:8501.
+Open the local URL printed by Streamlit, usually `http://localhost:8501`.
 
-## 3. Demo
-1. Leave the default high rainfall and drain blockage.
-2. Explain the graph: rainfall and blockage contribute to street flooding; flooding affects a road, traffic, emergency access, and a utility point.
-3. Note the risk indices and affected locations.
-4. Change the intervention to **Clear the critical drain**.
-5. Compare the baseline and intervention indices.
-6. Try **Protect the critical road** or **Reroute traffic early** to show different intervention points.
-7. Read the limitations aloud: this is a transparent rule-based simulation, not a trained forecast.
+## Demo flow
+1. Set rainfall to around 75 mm, blockage to 85%, and traffic to 65%.
+2. Review the map and weather status.
+3. Submit a clearly fictional incident report and show its purple pin.
+4. Inspect the dependency graph and baseline risks.
+5. Select “Clear the critical drain” and compare indices.
 
-## 4. Folder structure
-```text
-echomind_first_domino/
-├── app.py
-├── requirements.txt
-├── README.md
-├── ARCHITECTURE.md
-├── DEMO_SCRIPT.md
-├── PRESENTATION.md
-└── RESEARCH_NOTES.md
-```
+See `DEMO_VIDEO_SCRIPT.md` and `DEMO_VIDEO_CAPTIONS.srt` for the timed video plan and captions.
 
-## 5. Technical design
-- Streamlit: controls, dashboard, data table, metrics
-- Python: scenario rules and intervention comparison
-- NetworkX: directed dependency graph and downstream reach
-- Matplotlib: graph visualization
-- pandas: before/after table
-- SQLite: intentionally omitted; there is no persistent data in the MVP
-- scikit-learn: intentionally omitted until a real labeled dataset exists
-
-## 6. Score interpretation
-The 0–100 display is a normalized **illustrative risk index**, not a probability, measured confidence, or calibrated real-world risk. The intervention comparison reflects assumptions coded into the simulator.
-
-## 7. Known limitations
-- Fictional neighborhood and dependencies
-- No geospatial map or actual road routing
-- No real-time data, sensors, forecasts, or alerts
-- No calibrated probability estimates
-- No trained machine-learning model
-- Simplified linear/interaction formulas do not represent fluid dynamics or actual drainage hydraulics
+## Data and safety limitations
+This is a demonstration, not an operational warning system. The graph and scores are rule-based and illustrative—not calibrated probabilities or verified predictions. Map risk pins are sample points around the selected city center. Weather does not verify flooding. Incident reports are user-submitted and unverified, saved only to the local app machine, and are not transmitted to authorities. Do not use the prototype for emergency dispatch or infrastructure decisions.

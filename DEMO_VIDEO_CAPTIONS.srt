@@ -1,0 +1,47 @@
+1
+00:00:00,000 --> 00:00:10,000
+A blocked drain can become more than a drainage problem. During heavy rain, it can trigger flooding, road disruption, congestion, and emergency delays.
+
+2
+00:00:10,000 --> 00:00:20,000
+EchoMind helps us explore that chain. This hackathon prototype uses rainfall, drain blockage, and traffic load as scenario inputs.
+
+3
+00:00:20,000 --> 00:00:28,000
+Its scores are transparent, rule-based risk indices—not calibrated probabilities or verified predictions.
+
+4
+00:00:28,000 --> 00:00:43,000
+The map shows illustrative sample locations. Current weather is requested from Open-Meteo when internet access is available. The risk pins are not real flood detections.
+
+5
+00:00:43,000 --> 00:00:53,000
+Users can submit an observation, choose a severity, and add a landmark and coordinates.
+
+6
+00:00:53,000 --> 00:01:02,000
+Reports are saved locally and appear as purple pins. They remain unverified and are not sent to authorities.
+
+7
+00:01:02,000 --> 00:01:12,000
+The dependency graph connects rainfall and drainage blockage to flooding, road disruption, traffic congestion, emergency delay, and possible power interruption.
+
+8
+00:01:12,000 --> 00:01:22,000
+A simple downstream-impact heuristic suggests which starting hazard deserves attention in this scenario.
+
+9
+00:01:22,000 --> 00:01:32,000
+We can test an intervention such as clearing the critical drain and compare the baseline with the simulated outcome.
+
+10
+00:01:32,000 --> 00:01:42,000
+These changes help structure planning discussions, but they do not prove a real intervention will have the same effect.
+
+11
+00:01:42,000 --> 00:01:52,000
+The next step is validation with trusted local incident data, drainage information, and city partners.
+
+12
+00:01:52,000 --> 00:02:00,000
+EchoMind — First Domino AI, by BEST OF FOUR. Find the first domino before the impacts spread.
